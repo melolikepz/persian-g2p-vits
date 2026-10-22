@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+message: "If you use this repository, cite VITS, MMS, ManaTTS, and the upstream implementation."
+title: "Persian MMS/VITS Fine-tuning"
+type: software
+license: MIT
+version: 0.1.0
+authors:
+  - name: "Persian MMS/VITS contributors"
+repository-code: "https://github.com/melolikepz/persian-mms-tts-finetuning"
+references:
+  - type: conference-paper
+    title: "Conditional Variational Autoencoder with Adversarial Learning for End-to-End Text-to-Speech"
+    authors:
+      - family-names: Kim
+        given-names: Jaehyeon
+      - family-names: Kong
+        given-names: Jungil
+      - family-names: Son
+        given-names: Juhee
+    year: 2021
+    doi: 10.48550/arXiv.2106.06103
+  - type: article
+    title: "Scaling Speech Technology to 1,000+ Languages"
+    authors:
+      - family-names: Pratap
+        given-names: Vineel
+    year: 2024
+    journal: "Journal of Machine Learning Research"
+    volume: 25
+  - type: conference-paper
+    title: "ManaTTS Persian: a recipe for creating TTS datasets for lower resource languages"
+    authors:
+      - family-names: Qharabagh
+        given-names: Mahta Fetrat
+      - family-names: Dehghanian
+        given-names: Zahra
+      - family-names: Rabiee
+        given-names: Hamid R.
+    year: 2025
+    url: "https://aclanthology.org/2025.naacl-long.464/"
