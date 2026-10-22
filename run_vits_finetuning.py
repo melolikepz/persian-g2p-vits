@@ -168,6 +168,15 @@ class DataTrainingArguments:
     dataset_config_name: Optional[str] = field(
         default=None, metadata={"help": "The configuration name of the dataset to use (via the datasets library)."}
     )
+    dataset_data_files: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": (
+                "Optional local path or URL passed to datasets.load_dataset(data_files=...). "
+                "This is useful for training from one Parquet/JSON/CSV shard on Kaggle."
+            )
+        },
+    )
     overwrite_cache: bool = field(
         default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}
     )
@@ -586,6 +595,9 @@ def main():
 
     # 4. Load dataset
     raw_datasets = DatasetDict()
+    dataset_kwargs = {}
+    if data_args.dataset_data_files is not None:
+        dataset_kwargs["data_files"] = data_args.dataset_data_files
 
     if training_args.do_train:
         raw_datasets["train"] = load_dataset(
@@ -594,6 +606,7 @@ def main():
             split=data_args.train_split_name,
             cache_dir=model_args.cache_dir,
             token=model_args.token,
+            **dataset_kwargs,
         )
 
     if training_args.do_eval:
@@ -603,6 +616,7 @@ def main():
             split=data_args.eval_split_name,
             cache_dir=model_args.cache_dir,
             token=model_args.token,
+            **dataset_kwargs,
         )
 
     if data_args.audio_column_name not in next(iter(raw_datasets.values())).column_names:
@@ -697,10 +711,14 @@ def main():
 
     with training_args.main_process_first(desc="select range of samples"):
         if data_args.max_train_samples is not None:
-            raw_datasets["train"] = raw_datasets["train"].select(range(data_args.max_train_samples))
+            raw_datasets["train"] = raw_datasets["train"].select(
+                range(min(data_args.max_train_samples, len(raw_datasets["train"])))
+            )
 
         if data_args.max_eval_samples is not None:
-            raw_datasets["eval"] = raw_datasets["eval"].select(range(data_args.max_eval_samples))
+            raw_datasets["eval"] = raw_datasets["eval"].select(
+                range(min(data_args.max_eval_samples, len(raw_datasets["eval"])))
+            )
 
     speaker_id_dict = {}
     new_num_speakers = 0
@@ -1476,6 +1494,10 @@ def main():
             torch.nn.utils.remove_weight_norm(flow.conv_post)
 
         model.save_pretrained(training_args.output_dir)
+
+        # Keep local/Kaggle outputs self-contained even when push_to_hub is disabled.
+        feature_extractor.save_pretrained(training_args.output_dir)
+        tokenizer.save_pretrained(training_args.output_dir)
 
         if training_args.push_to_hub:
             VitsModel.from_pretrained(training_args.output_dir).push_to_hub(training_args.hub_model_id)

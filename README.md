@@ -1,5 +1,9 @@
 # Finetune VITS and MMS using HuggingFace's tools
 
+> **Persian + Kaggle:** see [KAGGLE_FA.md](KAGGLE_FA.md) and
+> [`notebooks/persian_mms_tts_kaggle.ipynb`](notebooks/persian_mms_tts_kaggle.ipynb)
+> for the ready-to-run `facebook/mms-tts-fas` fine-tuning workflow.
+
 ## Introduction
 
 [VITS](https://huggingface.co/docs/transformers/model_doc/vits) is a light weight, low-latency model for English text-to-speech (TTS). Massively Multilingual Speech ([MMS](https://huggingface.co/docs/transformers/model_doc/mms#speech-synthesis-tts)) is an extension of VITS for multilingual TTS, that supports over [1100 languages](https://huggingface.co/facebook/mms-tts#supported-languages). 
