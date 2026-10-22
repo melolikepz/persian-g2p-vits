@@ -1,99 +1,171 @@
-# Persian MMS/VITS fine-tuning
+# Persian MMS/VITS Fine-Tuning
 
 Fine-tune Meta's Persian [`facebook/mms-tts-fas`](https://huggingface.co/facebook/mms-tts-fas)
 checkpoint on the Persian [ManaTTS](https://huggingface.co/datasets/MahtaFetrat/Mana-TTS)
-dataset. The model is based on the VITS architecture; this project adapts the
-training recipe from [`ylacombe/finetune-hf-vits`](https://github.com/ylacombe/finetune-hf-vits)
-for a single Apple Silicon Mac.
+dataset.
 
-> The MMS checkpoint is licensed under CC BY-NC 4.0. Fine-tuned weights are
-> therefore for non-commercial use unless Meta grants additional rights.
+The base checkpoint uses the VITS architecture and is part of Meta's Massively
+Multilingual Speech (MMS) project. This repository adapts the training workflow
+from [`ylacombe/finetune-hf-vits`](https://github.com/ylacombe/finetune-hf-vits)
+for Persian text-to-speech.
 
-## اجرای سریع روی macOS
+> **License notice:** MMS model weights are licensed under CC BY-NC 4.0.
+> Fine-tuned weights derived from them are intended for non-commercial use
+> unless additional permission is granted by Meta.
 
-پیش‌نیازها: macOS روی Apple Silicon، پایتون 3.10 یا 3.11، حدود 15 گیگابایت فضای
-خالی و اینترنت. آموزش روی MPS انجام می‌شود و در صورت نیاز عملیات پشتیبانی‌نشده به
-CPU منتقل می‌شوند.
+## Features
+
+- Fine-tunes a Persian MMS/VITS checkpoint instead of training from scratch.
+- Uses a 1,000-sample subset of ManaTTS by default.
+- Includes automatic preparation of the VITS discriminator checkpoint.
+- Saves model, tokenizer, and feature-extractor files in one output directory.
+- Provides a command-line inference script for generating WAV files.
+- Automatically resumes from the latest saved checkpoint.
+
+## Requirements
+
+- Python 3.10 or 3.11
+- Git
+- An internet connection for downloading the model and dataset
+- A supported GPU is recommended; CPU training is possible but slow
+- Approximately 15 GB of free disk space
+
+## Quick Start
+
+Clone the repository and enter its directory:
 
 ```bash
+git clone https://github.com/melolikepz/persian-mms-tts-finetuning.git
 cd persian-mms-tts-finetuning
+```
+
+Create the Python environment, install dependencies, compile the Cython
+alignment module, and prepare the Persian training checkpoint:
+
+```bash
 ./scripts/setup_local.sh
+```
+
+Start fine-tuning:
+
+```bash
 ./scripts/train_local.sh
 ```
 
-اسکریپت اول محیط مجازی را می‌سازد، وابستگی‌ها را نصب می‌کند، افزونه Cython را
-کامپایل می‌کند و checkpoint فارسی دارای discriminator را در
-`checkpoints/mms-tts-fas-train` آماده می‌کند. اسکریپت دوم fine-tuning را با ۱۰۰۰
-نمونه ManaTTS آغاز می‌کند و خروجی را در `outputs/persian-mms-tts` می‌نویسد.
+The trained model and intermediate checkpoints are written to:
 
-برای تست صدای مدل:
-
-```bash
-./scripts/infer_local.sh "سلام، این یک آزمایش تبدیل متن فارسی به گفتار است."
+```text
+outputs/persian-mms-tts
 ```
 
-فایل صوتی در `outputs/sample.wav` ذخیره می‌شود. اگر هنوز آموزش انجام نشده باشد،
-اسکریپت به‌صورت خودکار مدل پایه `facebook/mms-tts-fas` را تست می‌کند.
+## Generate Speech
 
-## اجرای مرحله‌ای
+Run inference with a custom Persian sentence:
+
+```bash
+./scripts/infer_local.sh "YOUR_PERSIAN_TEXT"
+```
+
+The generated audio is saved as:
+
+```text
+outputs/sample.wav
+```
+
+If a fine-tuned checkpoint is not available yet, the inference script uses the
+base `facebook/mms-tts-fas` model.
+
+## Manual Workflow
+
+Activate the virtual environment:
 
 ```bash
 source .venv/bin/activate
+```
 
-# فقط آماده‌سازی checkpoint قابل آموزش
+Prepare the trainable Persian checkpoint with its discriminator:
+
+```bash
 python convert_original_discriminator_checkpoint.py \
   --language_code fas \
   --pytorch_dump_folder_path checkpoints/mms-tts-fas-train
+```
 
-# آموزش
-PYTORCH_ENABLE_MPS_FALLBACK=1 accelerate launch \
-  --num_processes 1 --mixed_precision no \
-  run_vits_finetuning.py training_config_examples/finetune_mms_fa_local.json
+Start training:
 
-# inference
+```bash
+accelerate launch \
+  --num_processes 1 \
+  --mixed_precision no \
+  run_vits_finetuning.py \
+  training_config_examples/finetune_mms_fa_local.json
+```
+
+Generate a WAV file directly with Python:
+
+```bash
 python scripts/infer.py \
   --model outputs/persian-mms-tts \
-  --text "سلام دنیا" \
+  --text "YOUR_PERSIAN_TEXT" \
   --output outputs/sample.wav
 ```
 
-برای یک تست سریع‌تر، مقدار `train_split_name`، تعداد epoch و batch size را در
-[`training_config_examples/finetune_mms_fa_local.json`](training_config_examples/finetune_mms_fa_local.json)
-کم کنید. برای ادامه آموزش قطع‌شده، همان فرمان train را دوباره اجرا کنید؛ آخرین
-checkpoint به‌طور خودکار شناسایی می‌شود.
+## Training Configuration
 
-## ساختار پروژه
+The default Persian configuration is located at
+[`training_config_examples/finetune_mms_fa_local.json`](training_config_examples/finetune_mms_fa_local.json).
+
+Important settings include:
+
+| Setting | Default | Description |
+|---|---:|---|
+| `train_split_name` | `train[25:1025]` | Uses 1,000 training samples |
+| `eval_split_name` | `train[:25]` | Uses 25 validation samples |
+| `num_train_epochs` | `20` | Number of training epochs |
+| `per_device_train_batch_size` | `2` | Training batch size per device |
+| `gradient_accumulation_steps` | `4` | Effective batch-size multiplier |
+| `learning_rate` | `0.00002` | Generator and discriminator learning rate |
+| `save_steps` | `250` | Checkpoint save interval |
+
+For a short test run, reduce the training range and the number of epochs. If a
+run is interrupted, execute the training command again to resume from the most
+recent checkpoint.
+
+## Project Structure
 
 ```text
 .
-├── checkpoints/                 # مدل پایه آماده آموزش (در Git ذخیره نمی‌شود)
-├── outputs/                     # checkpointها و نمونه‌های صوتی
+├── checkpoints/                 # Prepared base model; excluded from Git
+├── outputs/                     # Fine-tuned models and generated audio
 ├── scripts/
-│   ├── setup_local.sh
-│   ├── train_local.sh
-│   ├── infer_local.sh
-│   └── infer.py
+│   ├── setup_local.sh           # Environment and checkpoint preparation
+│   ├── train_local.sh           # Fine-tuning entry point
+│   ├── infer_local.sh           # Inference helper
+│   └── infer.py                 # Python inference script
 ├── training_config_examples/
 │   └── finetune_mms_fa_local.json
 ├── convert_original_discriminator_checkpoint.py
 └── run_vits_finetuning.py
 ```
 
-## مبنای علمی
+## Scientific Background
 
-این پروژه یک مقاله مستقل نیست؛ ترکیبی اجرایی از سه کار منتشرشده است:
+This repository is an implementation workflow rather than a standalone research
+paper. It combines three published components:
 
-- معماری VITS: *Conditional Variational Autoencoder with Adversarial Learning
-  for End-to-End Text-to-Speech* (ICML 2021)
-- مدل پایه MMS: *Scaling Speech Technology to 1,000+ Languages* (JMLR 2024)
-- دیتاست فارسی: *ManaTTS Persian: a recipe for creating TTS datasets for lower
-  resource languages* (NAACL 2025)
+1. **VITS architecture** — *Conditional Variational Autoencoder with Adversarial
+   Learning for End-to-End Text-to-Speech*, ICML 2021.
+2. **MMS base model** — *Scaling Speech Technology to 1,000+ Languages*, JMLR
+   2024.
+3. **ManaTTS dataset** — *ManaTTS Persian: a Recipe for Creating TTS Datasets
+   for Lower Resource Languages*, NAACL 2025.
 
-لینک و اطلاعات کامل استناد در [REFERENCES.md](REFERENCES.md) و
-[`CITATION.cff`](CITATION.cff) آمده است.
+Full publication links and citation details are available in
+[`REFERENCES.md`](REFERENCES.md) and [`CITATION.cff`](CITATION.cff).
 
-## مجوز و اعتبار
+## Acknowledgements
 
-کد این repository بر اساس پروژه MIT دارای مجوز
-[`ylacombe/finetune-hf-vits`](https://github.com/ylacombe/finetune-hf-vits) است؛
-فایل [LICENSE](LICENSE) را ببینید. مجوز کد با مجوز وزن‌های Meta یکی نیست.
+The training implementation is derived from Younes Lacombe's MIT-licensed
+[`finetune-hf-vits`](https://github.com/ylacombe/finetune-hf-vits) project. See
+[`LICENSE`](LICENSE) for the source-code license. The source-code license does
+not replace or override the license of the Meta MMS model weights.
