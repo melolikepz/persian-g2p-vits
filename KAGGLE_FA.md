@@ -10,11 +10,12 @@ on a shard of the open [ManaTTS Persian dataset](https://huggingface.co/datasets
 
 1. Create a Kaggle notebook.
 2. In **Notebook options**, enable a GPU and Internet.
-3. Import `notebooks/persian_mms_tts_kaggle.ipynb`, or copy its cells into the notebook.
+3. Upload `notebooks/persian_mms_tts_kaggle.ipynb` with **File > Import Notebook**.
 4. Run all cells from top to bottom.
 5. Download `persian-mms-tts.zip` from `/kaggle/working` when training finishes.
 
-The default run uses 1,000 training examples and 20 epochs so the complete pipeline can
+The notebook is self-contained: it clones the pinned upstream repository and applies the
+small Kaggle compatibility changes itself. The default run uses 1,000 training examples and 20 epochs so the complete pipeline can
 be checked within a Kaggle session. Increase `TRAIN_SAMPLES` and `EPOCHS` in the settings
 cell for a serious run. A full-dataset run may require several Kaggle sessions; checkpoints
 are kept in the output directory and the upstream script supports resuming.
