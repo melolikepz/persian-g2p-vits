@@ -58,6 +58,16 @@ The trained model and intermediate checkpoints are written to:
 outputs/persian-mms-tts
 ```
 
+## Jupyter Notebook
+
+The complete workflow is also available as a step-by-step notebook:
+
+[`notebooks/persian_mms_vits_finetuning.ipynb`](notebooks/persian_mms_vits_finetuning.ipynb)
+
+Open it in JupyterLab or VS Code, select a Python 3.10 or 3.11 kernel, and run
+the cells in order. The notebook covers dependency installation, checkpoint
+preparation, configurable fine-tuning, inference, and inline audio playback.
+
 ## Generate Speech
 
 Run inference with a custom Persian sentence:
@@ -137,6 +147,8 @@ recent checkpoint.
 .
 ├── checkpoints/                 # Prepared base model; excluded from Git
 ├── outputs/                     # Fine-tuned models and generated audio
+├── notebooks/
+│   └── persian_mms_vits_finetuning.ipynb
 ├── scripts/
 │   ├── setup_local.sh           # Environment and checkpoint preparation
 │   ├── train_local.sh           # Fine-tuning entry point
