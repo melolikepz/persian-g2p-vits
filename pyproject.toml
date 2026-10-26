@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "persian-g2p-vits"
+version = "0.1.0"
+description = "Persian TTS training with Homo-GE2PE and Coqui VITS"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = { text = "MIT" }
+authors = [{ name = "melolikepz" }]
+dependencies = [
+  "torch>=2.2",
+  "torchaudio>=2.2",
+  "coqui-tts[codec]==0.27.5",
+  "transformers==5.15.0",
+  "datasets[audio]>=3.2,<4",
+  "huggingface-hub>=0.26",
+  "soundfile>=0.12",
+  "numpy>=1.26,<3",
+]
+
+[project.optional-dependencies]
+notebook = ["jupyterlab>=4,<5", "ipykernel>=6,<7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

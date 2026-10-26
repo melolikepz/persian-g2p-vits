@@ -1,183 +1,151 @@
-# Persian MMS/VITS Fine-Tuning
+# Persian G2P VITS
 
-Fine-tune Meta's Persian [`facebook/mms-tts-fas`](https://huggingface.co/facebook/mms-tts-fas)
-checkpoint on the Persian [ManaTTS](https://huggingface.co/datasets/MahtaFetrat/Mana-TTS)
-dataset.
+Train a single-speaker Persian text-to-speech model with an explicit, mandatory grapheme-to-phoneme stage.
 
-The base checkpoint uses the VITS architecture and is part of Meta's Massively
-Multilingual Speech (MMS) project. This repository adapts the training workflow
-from [`ylacombe/finetune-hf-vits`](https://github.com/ylacombe/finetune-hf-vits)
-for Persian text-to-speech.
+```text
+Persian text -> Homo-GE2PE -> phoneme sequence -> Coqui VITS -> waveform
+```
 
-> **License notice:** MMS model weights are licensed under CC BY-NC 4.0.
-> Fine-tuned weights derived from them are intended for non-commercial use
-> unless additional permission is granted by Meta.
+This is a train-from-scratch VITS recipe, not an MMS checkpoint fine-tune. During dataset preparation, every ManaTTS transcript is converted to phonemes by Homo-GE2PE. VITS is trained only on those phoneme strings. During synthesis, Persian text must therefore pass through the same G2P model before it can be given to VITS.
 
-## Features
+## Components
 
-- Fine-tunes a Persian MMS/VITS checkpoint instead of training from scratch.
-- Uses a 1,000-sample subset of ManaTTS by default.
-- Includes automatic preparation of the VITS discriminator checkpoint.
-- Saves model, tokenizer, and feature-extractor files in one output directory.
-- Provides a command-line inference script for generating WAV files.
-- Automatically resumes from the latest saved checkpoint.
+- **G2P:** [`mehdi-hf/Homo-GE2PE-Persian-HF`](https://huggingface.co/mehdi-hf/Homo-GE2PE-Persian-HF), a Transformers-compatible packaging of the original [`MahtaFetrat/Homo-GE2PE-Persian`](https://huggingface.co/MahtaFetrat/Homo-GE2PE-Persian) weights.
+- **Acoustic model and vocoder:** [Coqui VITS](https://github.com/idiap/coqui-ai-TTS).
+- **Training data:** [ManaTTS](https://huggingface.co/datasets/MahtaFetrat/Mana-TTS), a 114-hour single-speaker Persian corpus.
 
 ## Requirements
 
-- Python 3.10 or 3.11
+- Python 3.10 to 3.13
 - Git
-- An internet connection for downloading the model and dataset
-- A supported GPU is recommended; CPU training is possible but slow
-- Approximately 15 GB of free disk space
+- At least 15 GB of free disk space for a practical experiment
+- A CUDA-capable GPU is strongly recommended for full training; CPU training is possible but very slow
 
-## Quick Start
+## Quick start
 
-Clone the repository and enter its directory:
-
-```bash
-git clone https://github.com/melolikepz/persian-mms-tts-finetuning.git
-cd persian-mms-tts-finetuning
-```
-
-Create the Python environment, install dependencies, compile the Cython
-alignment module, and prepare the Persian training checkpoint:
+Clone the repository and create the environment:
 
 ```bash
-./scripts/setup_local.sh
+git clone https://github.com/melolikepz/persian-g2p-vits.git
+cd persian-g2p-vits
+bash scripts/setup.sh
 ```
 
-Start fine-tuning:
+Prepare 1,000 utterances from the first ManaTTS shard. This downloads the dataset and G2P model, writes audio files, and stores the generated phonemes in an LJSpeech-style manifest:
 
 ```bash
-./scripts/train_local.sh
+bash scripts/prepare.sh --max-samples 1000
 ```
 
-The trained model and intermediate checkpoints are written to:
-
-```text
-outputs/persian-mms-tts
-```
-
-## Jupyter Notebook
-
-The complete workflow is also available as a step-by-step notebook:
-
-[`notebooks/persian_mms_vits_finetuning.ipynb`](notebooks/persian_mms_vits_finetuning.ipynb)
-
-Open it in JupyterLab or VS Code, select a Python 3.10 or 3.11 kernel, and run
-the cells in order. The notebook covers dependency installation, checkpoint
-preparation, configurable fine-tuning, inference, and inline audio playback.
-
-## Generate Speech
-
-Run inference with a custom Persian sentence:
+Start VITS training:
 
 ```bash
-./scripts/infer_local.sh "YOUR_PERSIAN_TEXT"
+bash scripts/train.sh --epochs 1000 --batch-size 16
 ```
 
-The generated audio is saved as:
-
-```text
-outputs/sample.wav
-```
-
-If a fine-tuned checkpoint is not available yet, the inference script uses the
-base `facebook/mms-tts-fas` model.
-
-## Manual Workflow
-
-Activate the virtual environment:
+The checkpoints and TensorBoard logs are written below `outputs/`. To monitor a run:
 
 ```bash
 source .venv/bin/activate
+tensorboard --logdir outputs
 ```
 
-Prepare the trainable Persian checkpoint with its discriminator:
+Synthesize Persian text with the newest trained checkpoint:
 
 ```bash
-python convert_original_discriminator_checkpoint.py \
-  --language_code fas \
-  --pytorch_dump_folder_path checkpoints/mms-tts-fas-train
+source .venv/bin/activate
+python scripts/infer.py \
+  --text "سلام، این یک آزمایش تبدیل متن فارسی به گفتار است." \
+  --output outputs/example.wav
 ```
 
-Start training:
-
-```bash
-accelerate launch \
-  --num_processes 1 \
-  --mixed_precision no \
-  run_vits_finetuning.py \
-  training_config_examples/finetune_mms_fa_local.json
-```
-
-Generate a WAV file directly with Python:
+`scripts/infer.py` first runs Homo-GE2PE, prints the generated phoneme sequence, and then passes that sequence to VITS. It can also use explicit model files:
 
 ```bash
 python scripts/infer.py \
-  --model outputs/persian-mms-tts \
-  --text "YOUR_PERSIAN_TEXT" \
-  --output outputs/sample.wav
+  --text "امروز هوا بسیار خوب است." \
+  --checkpoint outputs/<run>/best_model.pth \
+  --config outputs/<run>/config.json \
+  --output outputs/weather.wav
 ```
 
-## Training Configuration
+## Notebook
 
-The default Persian configuration is located at
-[`training_config_examples/finetune_mms_fa_local.json`](training_config_examples/finetune_mms_fa_local.json).
+The complete workflow is also available in [`notebooks/persian_g2p_vits_training.ipynb`](notebooks/persian_g2p_vits_training.ipynb). Select the **Persian G2P VITS** kernel created by `scripts/setup.sh`, then run the cells in order.
 
-Important settings include:
+The notebook covers:
 
-| Setting | Default | Description |
-|---|---:|---|
-| `train_split_name` | `train[25:1025]` | Uses 1,000 training samples |
-| `eval_split_name` | `train[:25]` | Uses 25 validation samples |
-| `num_train_epochs` | `20` | Number of training epochs |
-| `per_device_train_batch_size` | `2` | Training batch size per device |
-| `gradient_accumulation_steps` | `4` | Effective batch-size multiplier |
-| `learning_rate` | `0.00002` | Generator and discriminator learning rate |
-| `save_steps` | `250` | Checkpoint save interval |
+1. environment verification;
+2. Persian G2P preview;
+3. ManaTTS preparation;
+4. VITS training;
+5. synthesis and audio playback.
 
-For a short test run, reduce the training range and the number of epochs. If a
-run is interrupted, execute the training command again to resume from the most
-recent checkpoint.
+## Dataset preparation details
 
-## Project Structure
+The default command reads `dataset/dataset_part_001.parquet` from ManaTTS and keeps utterances between 1 and 15 seconds. Increase the sample count or select multiple Parquet files for a serious run:
+
+```bash
+bash scripts/prepare.sh \
+  --data-files "dataset/dataset_part_*.parquet" \
+  --max-samples 50000 \
+  --batch-size 32
+```
+
+Generated files:
 
 ```text
-.
-├── checkpoints/                 # Prepared base model; excluded from Git
-├── outputs/                     # Fine-tuned models and generated audio
-├── notebooks/
-│   └── persian_mms_vits_finetuning.ipynb
-├── scripts/
-│   ├── setup_local.sh           # Environment and checkpoint preparation
-│   ├── train_local.sh           # Fine-tuning entry point
-│   ├── infer_local.sh           # Inference helper
-│   └── infer.py                 # Python inference script
-├── training_config_examples/
-│   └── finetune_mms_fa_local.json
-├── convert_original_discriminator_checkpoint.py
-└── run_vits_finetuning.py
+data/manatts-g2p/
+├── metadata.csv       # id|phonemes|phonemes, consumed by Coqui
+├── metadata.jsonl     # original text, phonemes, and source metadata for auditing
+└── wavs/              # training waveforms
 ```
 
-## Scientific Background
+The generated data is intentionally excluded from Git.
 
-This repository is an implementation workflow rather than a standalone research
-paper. It combines three published components:
+## Why `use_phonemes=False` appears in the VITS config
 
-1. **VITS architecture** — *Conditional Variational Autoencoder with Adversarial
-   Learning for End-to-End Text-to-Speech*, ICML 2021.
-2. **MMS base model** — *Scaling Speech Technology to 1,000+ Languages*, JMLR
-   2024.
-3. **ManaTTS dataset** — *ManaTTS Persian: a Recipe for Creating TTS Datasets
-   for Lower Resource Languages*, NAACL 2025.
+Coqui's `use_phonemes` option means “ask Coqui to run its own phonemizer.” This project performs phonemization explicitly with Homo-GE2PE before Coqui sees the text. The VITS manifest already contains phonemes, so `use_phonemes=False` prevents accidental second phonemization. The model input is still phonemic, and Persian graphemes cannot be used directly with the trained VITS checkpoint.
 
-Full publication links and citation details are available in
-[`REFERENCES.md`](REFERENCES.md) and [`CITATION.cff`](CITATION.cff).
+## Useful options
 
-## Acknowledgements
+Use a different device for G2P:
 
-The training implementation is derived from Younes Lacombe's MIT-licensed
-[`finetune-hf-vits`](https://github.com/ylacombe/finetune-hf-vits) project. See
-[`LICENSE`](LICENSE) for the source-code license. The source-code license does
-not replace or override the license of the Meta MMS model weights.
+```bash
+python scripts/prepare_dataset.py --device cuda
+python scripts/infer.py --device cuda --text "سلام"
+```
+
+Run a small smoke test:
+
+```bash
+bash scripts/prepare.sh --max-samples 50
+bash scripts/train.sh --epochs 2 --batch-size 4 --eval-batch-size 2
+```
+
+Resume a Coqui run from its run directory:
+
+```bash
+source .venv/bin/activate
+python -m TTS.bin.train_tts --continue_path outputs/<run-directory>
+```
+
+## Repository layout
+
+```text
+src/persian_g2p_vits/g2p.py       Homo-GE2PE wrapper and normalization
+scripts/prepare_dataset.py         ManaTTS download and phoneme manifest creation
+scripts/train_vits.py              Coqui VITS training recipe
+scripts/infer.py                   End-to-end Persian synthesis
+notebooks/                         Executable training notebook
+```
+
+## License and attribution
+
+The original code in this repository is MIT licensed. External models, datasets, and libraries retain their own licenses:
+
+- Homo-GE2PE Persian model packaging: MIT; credit the original GE2PE/Homo-GE2PE authors.
+- Coqui AI TTS: MPL-2.0.
+- ManaTTS: CC0-1.0.
+
+See [`NOTICE.md`](NOTICE.md) and [`REFERENCES.md`](REFERENCES.md) before redistributing trained artifacts.

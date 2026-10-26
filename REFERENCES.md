@@ -1,34 +1,33 @@
-# Papers and sources
+# References
 
-## Architecture: VITS
+## VITS
 
-Jaehyeon Kim, Jungil Kong, and Juhee Son. “Conditional Variational Autoencoder
-with Adversarial Learning for End-to-End Text-to-Speech.” ICML 2021.
+Jaehyeon Kim, Jungil Kong, and Juhee Son. “Conditional Variational Autoencoder with Adversarial Learning for End-to-End Text-to-Speech.” *Proceedings of ICML 2021*.
 
-- Paper: https://proceedings.mlr.press/v139/kim21f/kim21f.pdf
-- arXiv: https://arxiv.org/abs/2106.06103
+- Paper: https://proceedings.mlr.press/v139/kim21f.html
+- Reference implementation: https://github.com/jaywalnut310/vits
 
-## Base multilingual model: MMS
+```bibtex
+@inproceedings{kim2021vits,
+  title={Conditional Variational Autoencoder with Adversarial Learning for End-to-End Text-to-Speech},
+  author={Kim, Jaehyeon and Kong, Jungil and Son, Juhee},
+  booktitle={Proceedings of the 38th International Conference on Machine Learning},
+  year={2021}
+}
+```
 
-Vineel Pratap et al. “Scaling Speech Technology to 1,000+ Languages.” JMLR 25,
-2024.
+## GE2PE and Homo-GE2PE
 
-- Paper: https://jmlr.org/papers/volume25/23-1318/23-1318.pdf
-- arXiv: https://arxiv.org/abs/2305.13516
-- Persian checkpoint: https://huggingface.co/facebook/mms-tts-fas
+- GE2PE paper and official code: https://github.com/Sharif-SLPL/GE2PE
+- Homo-GE2PE Persian model: https://huggingface.co/MahtaFetrat/Homo-GE2PE-Persian
+- Transformers-compatible packaging used here: https://huggingface.co/mehdi-hf/Homo-GE2PE-Persian-HF
+- Homo-GE2PE paper, “Fast, Not Fancy: Rethinking G2P with Rich Data and Rule-Based Models”: https://arxiv.org/abs/2505.12973
 
-## Persian dataset: ManaTTS
+## ManaTTS
 
-Mahta Fetrat Qharabagh, Zahra Dehghanian, and Hamid R. Rabiee. “ManaTTS
-Persian: a recipe for creating TTS datasets for lower resource languages.”
-NAACL 2025.
-
-- Paper: https://aclanthology.org/2025.naacl-long.464/
 - Dataset: https://huggingface.co/datasets/MahtaFetrat/Mana-TTS
 
-## Training implementation
+## Coqui AI TTS
 
-This repository is derived from Younes Lacombe's MIT-licensed
-`finetune-hf-vits` implementation:
-
-- https://github.com/ylacombe/finetune-hf-vits
+- Maintained project: https://github.com/idiap/coqui-ai-TTS
+- Documentation: https://coqui-tts.readthedocs.io/
