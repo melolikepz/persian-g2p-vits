@@ -124,7 +124,10 @@ def main() -> None:
     print(f"Evaluation samples: {len(eval_samples)}")
     print(f"Phoneme character inventory ({len(characters)}): {characters}")
 
-    model = Vits(config)
+    # ``Vits(config)`` creates only the neural network.  Training also needs
+    # Coqui's audio processor and tokenizer, which ``init_from_config`` builds
+    # from the character inventory above.
+    model = Vits.init_from_config(config, samples=train_samples + eval_samples)
     trainer = Trainer(
         TrainerArgs(),
         config,
