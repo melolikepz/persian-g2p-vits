@@ -83,7 +83,10 @@ def main() -> None:
         mel_fmin=0,
         mel_fmax=None,
     )
-    eval_size = min(args.eval_samples, max(1, len(phoneme_texts) - 1))
+    eval_count = min(args.eval_samples, max(1, len(phoneme_texts) - 1))
+    # Coqui treats values in (0, 1] as a proportion and values >1 as an
+    # absolute count. Preserve one training row even in a tiny smoke test.
+    eval_size = eval_count if eval_count > 1 else eval_count / len(phoneme_texts)
     config = VitsConfig(
         audio=audio_config,
         run_name=args.run_name,
@@ -112,7 +115,8 @@ def main() -> None:
         cudnn_benchmark=torch.cuda.is_available(),
     )
     train_samples, eval_samples = load_tts_samples(
-        config,
+        # coqui-tts 0.27.x accepts the dataset list rather than VitsConfig.
+        config.datasets,
         eval_split=True,
         eval_split_size=eval_size,
     )
