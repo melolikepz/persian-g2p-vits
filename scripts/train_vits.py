@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 
+import soundfile as sf
 import torch
+from scipy.signal import resample_poly
 from trainer import Trainer, TrainerArgs
 
 from persian_g2p_vits.coqui_compat import prepare_coqui_transformers_compatibility
@@ -15,9 +18,45 @@ prepare_coqui_transformers_compatibility()
 
 from TTS.config.shared_configs import BaseAudioConfig
 from TTS.tts.configs.shared_configs import BaseDatasetConfig
+from TTS.tts.datasets import dataset as tts_dataset
 from TTS.tts.configs.vits_config import VitsConfig
 from TTS.tts.datasets import load_tts_samples
+from TTS.tts.models import vits as tts_vits
 from TTS.tts.models.vits import CharactersConfig, Vits
+
+
+def _wav_frame_count(audio_path: str | Path) -> int:
+    """Read WAV metadata without TorchCodec/FFmpeg.
+
+    Coqui routes file-length discovery through TorchCodec on PyTorch 2.9+.
+    The package needs a system FFmpeg shared library on macOS, although the
+    PCM WAV files produced by ``prepare_dataset.py`` can be read directly by
+    SoundFile.  Keeping this local override makes the training recipe portable.
+    """
+    return int(sf.info(str(audio_path)).frames)
+
+
+# Patch only Coqui's metadata probe; audio waveforms are still loaded through
+# its normal AudioProcessor path.
+tts_dataset.get_audio_size = _wav_frame_count
+
+
+def configure_wav_loader(target_sample_rate: int) -> None:
+    """Use SoundFile for VITS batch loading and resample source WAVs safely."""
+
+    def load_audio_with_soundfile(audio_path: str | Path) -> tuple[torch.Tensor, int]:
+        samples, source_sample_rate = sf.read(str(audio_path), dtype="float32", always_2d=True)
+        mono = samples.mean(axis=1)
+        if source_sample_rate != target_sample_rate:
+            divisor = math.gcd(source_sample_rate, target_sample_rate)
+            mono = resample_poly(
+                mono,
+                target_sample_rate // divisor,
+                source_sample_rate // divisor,
+            ).astype("float32", copy=False)
+        return torch.from_numpy(mono.copy()).unsqueeze(0), target_sample_rate
+
+    tts_vits.load_audio = load_audio_with_soundfile
 
 
 def parse_args() -> argparse.Namespace:
@@ -29,7 +68,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--eval-batch-size", type=int, default=8)
-    parser.add_argument("--num-workers", type=int, default=2)
+    # A zero-worker default also keeps the SoundFile loader in this process.
+    # It avoids macOS spawn workers reverting to PyTorch's TorchCodec loader.
+    parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--eval-samples", type=int, default=25)
     parser.add_argument("--min-duration", type=float, default=1.0)
     parser.add_argument("--max-duration", type=float, default=15.0)
@@ -49,6 +90,7 @@ def read_phoneme_texts(metadata_path: Path) -> list[str]:
 
 def main() -> None:
     args = parse_args()
+    configure_wav_loader(args.sample_rate)
     data_dir = args.data_dir.resolve()
     output_dir = args.output_dir.resolve()
     metadata_path = data_dir / "metadata.csv"
