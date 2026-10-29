@@ -74,6 +74,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-samples", type=int, default=25)
     parser.add_argument("--min-duration", type=float, default=1.0)
     parser.add_argument("--max-duration", type=float, default=15.0)
+    parser.add_argument(
+        "--continue-path",
+        type=Path,
+        default=None,
+        help="Resume an existing Coqui training run from its newest checkpoint.",
+    )
     return parser.parse_args()
 
 
@@ -170,8 +176,11 @@ def main() -> None:
     # Coqui's audio processor and tokenizer, which ``init_from_config`` builds
     # from the character inventory above.
     model = Vits.init_from_config(config, samples=train_samples + eval_samples)
+    trainer_args = TrainerArgs(
+        continue_path=str(args.continue_path.resolve()) if args.continue_path else "",
+    )
     trainer = Trainer(
-        TrainerArgs(),
+        trainer_args,
         config,
         str(output_dir),
         model=model,
