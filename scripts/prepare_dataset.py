@@ -69,56 +69,83 @@ def main() -> None:
         "MahtaFetrat/Mana-TTS",
         data_files=args.data_files,
         split="train",
+        streaming=True,
     )
-    selected: list[dict[str, Any]] = []
-    for row in dataset:
-        if eligible(row, args.min_duration, args.max_duration):
-            selected.append(row)
-        if len(selected) >= args.max_samples:
-            break
-    if not selected:
-        raise RuntimeError("No samples passed the transcript and duration filters")
-
-    print(f"Running {args.g2p_model} on {len(selected)} transcripts")
+    print(f"Running {args.g2p_model} on up to {args.max_samples} transcripts")
     g2p = PersianG2P(args.g2p_model, device=args.device)
-    manifest_lines: list[str] = []
-    audit_records: list[dict[str, Any]] = []
 
-    for start in range(0, len(selected), args.batch_size):
-        batch = selected[start : start + args.batch_size]
-        texts = [normalize_persian_text(str(row["transcript"])) for row in batch]
+    selected_count = 0
+    prepared_count = 0
+    batch: list[dict[str, Any]] = []
+
+    def prepare_batch(
+        rows: list[dict[str, Any]], manifest_file: Any, audit_file: Any
+    ) -> int:
+        nonlocal prepared_count
+        if not rows:
+            return 0
+
+        texts = [normalize_persian_text(str(row["transcript"])) for row in rows]
         phoneme_texts = g2p.phonemize_batch(texts)
 
-        for row, text, phonemes in zip(batch, texts, phoneme_texts, strict=True):
+        written = 0
+        for row, text, phonemes in zip(rows, texts, phoneme_texts, strict=True):
             phonemes = phonemes.replace("|", " ").strip()
             if not phonemes:
                 continue
-            sample_id = f"sample_{len(manifest_lines):06d}"
+            sample_id = f"sample_{prepared_count:06d}"
             samples, sample_rate = audio_array(row)
             if samples.ndim > 1:
                 samples = samples.mean(axis=1)
             sf.write(wav_dir / f"{sample_id}.wav", samples, sample_rate, subtype="PCM_16")
-            manifest_lines.append(f"{sample_id}|{phonemes}|{phonemes}")
-            audit_records.append(
-                {
-                    "id": sample_id,
-                    "source_file": row.get("file_name"),
-                    "text": text,
-                    "phonemes": phonemes,
-                    "duration": float(row.get("duration") or 0.0),
-                    "sample_rate": sample_rate,
-                    "g2p_model": args.g2p_model,
-                }
+            manifest_file.write(f"{sample_id}|{phonemes}|{phonemes}\n")
+            audit_file.write(
+                json.dumps(
+                    {
+                        "id": sample_id,
+                        "source_file": row.get("file_name"),
+                        "text": text,
+                        "phonemes": phonemes,
+                        "duration": float(row.get("duration") or 0.0),
+                        "sample_rate": sample_rate,
+                        "g2p_model": args.g2p_model,
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
             )
-        print(f"Prepared {len(manifest_lines)}/{len(selected)} samples")
+            prepared_count += 1
+            written += 1
 
-    metadata_path.write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
-    with audit_path.open("w", encoding="utf-8") as audit_file:
-        for record in audit_records:
-            audit_file.write(json.dumps(record, ensure_ascii=False) + "\n")
+        manifest_file.flush()
+        audit_file.flush()
+        print(f"Prepared {prepared_count}/{args.max_samples} samples", flush=True)
+        return written
+
+    with (
+        metadata_path.open("w", encoding="utf-8") as manifest_file,
+        audit_path.open("w", encoding="utf-8") as audit_file,
+    ):
+        for row in dataset:
+            if not eligible(row, args.min_duration, args.max_duration):
+                continue
+            batch.append(row)
+            selected_count += 1
+
+            if len(batch) >= args.batch_size:
+                prepare_batch(batch, manifest_file, audit_file)
+                batch.clear()
+
+            if selected_count >= args.max_samples:
+                break
+
+        prepare_batch(batch, manifest_file, audit_file)
+
+    if prepared_count == 0:
+        raise RuntimeError("No samples passed the transcript and duration filters")
 
     print(f"Dataset ready: {output_dir}")
-    print(f"Training rows: {len(manifest_lines)}")
+    print(f"Training rows: {prepared_count}")
 
 
 if __name__ == "__main__":
